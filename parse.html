@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Parse PDF → questions.json (tự nhận đáp án bôi đậm & gạch chân)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:20px;color:#222}
+    .wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .box{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff}
+    textarea{width:100%;height:45vh;padding:12px;border:1px solid #e5e7eb;border-radius:10px}
+    [contenteditable]{min-height:45vh;border:1px dashed #cbd5e1;border-radius:10px;padding:12px;outline:none}
+    button{border:0;background:#0d6efd;color:#fff;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer;margin-right:8px}
+    .muted{color:#6b7280;font-size:12px}
+    .q{border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:10px 0}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:12px}
+    .ansbtn{border:1px solid #e5e7eb;background:#f8fafc;color:#111;padding:6px 10px;border-radius:8px;cursor:pointer}
+    .ansbtn.active{border-color:#16a34a;background:#ecfdf5}
+    .right{color:#16a34a;font-weight:700}
+    .danger{background:#ef4444}
+  </style>
+</head>
+<body>
+  <h2>Chuyển nội dung 100 câu hỏi → <code>questions.json</code> (có <code>answer</code>)</h2>
+  <p class="muted">Mẹo: Nếu có thể, hãy dán vào khung <b>HTML (giữ định dạng)</b> để công cụ tự nhận phương án được <b>đậm</b> và <u>gạch chân</u> là đáp án đúng.</p>
+
+  <div class="wrap">
+    <div class="box">
+      <h3>1) Dán HTML (giữ định dạng)</h3>
+      <div id="htmlIn" contenteditable="true" spellcheck="false" placeholder="Dán nội dung có giữ <b>đậm</b>, <u>gạch chân</u> từ PDF/Word..."></div>
+      <p class="muted">Nếu dán vào đây mà mất định dạng, hãy dùng khung “Văn bản thuần” ở bên phải.</p>
+    </div>
+    <div class="box">
+      <h3>2) Dán văn bản thuần</h3>
+      <textarea id="textIn" placeholder="Dán nội dung chỉ còn chữ (Câu X:, A., B., C.). Bạn có thể sửa đáp án trong bước 3)."></textarea>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <button id="btnParse">Tạo danh sách câu hỏi</button>
+    <button id="btnExport" class="danger" disabled>Tải <code>questions.json</code></button>
+    <button id="btnExportKey" disabled>Tải <code>answer_key.json</code></button>
+    <span id="stat" class="muted" style="margin-left:8px"></span>
+  </div>
+
+  <h3 style="margin-top:16px">3) Kiểm tra nhanh & chỉnh đáp án (nếu cần)</h3>
+  <div id="preview"></div>
+
+  <script>
+    const clean = s => s.replace(/\s+/g,' ').trim();
+
+    // --- Parse from HTML keeping <b><u> ---
+    function parseFromHTML(html){
+      // Chuyển <br> thành \n để dễ regex
+      let h = html.replace(/<br\s*\/?>/gi, '\n');
+      // Bóc plain text cho từng dòng nhưng vẫn còn thẻ để biết b/u
+      // Tách từng block bắt đầu bằng "Câu N:"
+      const blocks = [];
+      const parts = h.split(/(?=Câu\s+\d+\s*:)/g);
+      for (const raw of parts) {
+        const m = raw.match(/^Câu\s+(\d+)\s*:\s*([\s\S]+)/);
+        if (!m) continue;
+        const id = Number(m[1]);
+        const body = m[2];
+
+        // Tách A., B., C. (giữ HTML)
+        const am = body.match(/A\.\s*([\s\S]*?)\n+B\./);
+        const bm = body.match(/B\.\s*([\s\S]*?)\n+C\./);
+        const cm = body.match(/C\.\s*([\s\S]*)$/);
+        if (!am || !bm || !cm) continue;
+
+        const header = body.split(/A\.\s*/)[0];
+        const text = clean(stripTags(header));
+
+        const Ahtml = am[1].trim();
+        const Bhtml = bm[1].trim();
+        const Chtml = cm[1].trim();
+
+        const A = clean(stripTags(Ahtml));
+        const B = clean(stripTags(Bhtml));
+        const C = clean(stripTags(Chtml));
+
+        // Phát hiện đáp án: phải có <b> và <u> nằm trong cùng phương án
+        const hasStrong = s => /<\s*b[\s>]/i.test(s);
+        const hasUnder = s => /<\s*u[\s>]/i.test(s);
+        let answer = null;
+        if (hasStrong(Ahtml) && hasUnder(Ahtml)) answer = 'A';
+        if (hasStrong(Bhtml) && hasUnder(Bhtml)) answer = answer ? answer : 'B';
+        if (hasStrong(Chtml) && hasUnder(Chtml)) answer = answer ? answer : 'C';
+
+        blocks.push({ id, text, A, B, C, answer });
+      }
+      return blocks.sort((a,b)=>a.id-b.id);
+    }
+
+    // --- Parse from plain text (no formatting). Answer will be null; user can click to set.
+    function parseFromText(t){
+      const text = t.replace(/\r/g,'').replace(/\u00A0/g,' ').replace(/[ \t]+\n/g,'\n');
+      const re = /Câu\s+(\d+)\s*:\s*([\s\S]*?)(?:\n+|\s+)A\.\s*([\s\S]*?)\n+B\.\s*([\s\S]*?)\n+C\.\s*([\s\S]*?)(?=\n+Câu\s+\d+\s*:|$)/g;
+      const arr = [];
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const id = Number(m[1]);
+        const qtext = clean(m[2]);
+        const A = clean(m[3]); const B = clean(m[4]); const C = clean(m[5]);
+        if (!qtext || !A || !B || !C) continue;
+        arr.push({ id, text: qtext, A, B, C, answer: null });
+      }
+      return arr.sort((a,b)=>a.id-b.id);
+    }
+
+    function stripTags(html){
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    }
+
+    function mergePreferHTML(htmlArr, textArr){
+      if (htmlArr.length) return htmlArr;
+      return textArr;
+    }
+
+    function renderPreview(arr){
+      const box = document.getElementById('preview');
+      box.innerHTML = '';
+      arr.forEach(q => {
+        const el = document.createElement('div');
+        el.className = 'q';
+        el.innerHTML = `
+          <div><span class="pill">Mã: ${q.id}</span> &nbsp; <b>${q.text}</b></div>
+          <div class="row" style="margin-top:6px">
+            <button class="ansbtn ${q.answer==='A'?'active':''}" data-id="${q.id}" data-v="A">Chọn A</button>
+            <button class="ansbtn ${q.answer==='B'?'active':''}" data-id="${q.id}" data-v="B">Chọn B</button>
+            <button class="ansbtn ${q.answer==='C'?'active':''}" data-id="${q.id}" data-v="C">Chọn C</button>
+            <span style="margin-left:8px">Đang gán: <span class="right">${q.answer||'—'}</span></span>
+          </div>
+          <ul style="margin:6px 0 0 20px">
+            <li><b>A.</b> ${q.A}</li>
+            <li><b>B.</b> ${q.B}</li>
+            <li><b>C.</b> ${q.C}</li>
+          </ul>
+        `;
+        box.appendChild(el);
+      });
+
+      // Click to set answer
+      box.querySelectorAll('.ansbtn').forEach(btn=>{
+        btn.onclick = () => {
+          const id = Number(btn.dataset.id);
+          const v = btn.dataset.v;
+          const q = data.find(x=>x.id===id);
+          q.answer = v;
+          renderPreview(data);
+        };
+      });
+    }
+
+    function download(filename, content, mime='application/json;charset=utf-8'){
+      const blob = new Blob([content], {type:mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    let data = [];
+
+    document.getElementById('btnParse').onclick = () => {
+      const html = document.getElementById('htmlIn').innerHTML;
+      const text = document.getElementById('textIn').value;
+
+      const fromHTML = html.trim() ? parseFromHTML(html) : [];
+      const fromText = text.trim() ? parseFromText(text) : [];
+
+      data = mergePreferHTML(fromHTML, fromText);
+
+      document.getElementById('stat').textContent =
+        data.length ? `Đã nhận ${data.length} câu. (Tự bắt đáp án: ${data.filter(q=>q.answer).length} câu)` : 'Chưa thấy dữ liệu hợp lệ';
+      document.getElementById('btnExport').disabled = data.length===0;
+      document.getElementById('btnExportKey').disabled = data.length===0;
+
+      renderPreview(data);
+      window.scrollTo({top:document.getElementById('preview').offsetTop-10,behavior:'smooth'});
+    };
+
+    document.getElementById('btnExport').onclick = () => {
+      if (!data.length) return;
+      // xuất questions.json có field answer
+      download('questions.json', JSON.stringify(data, null, 2));
+    };
+
+    document.getElementById('btnExportKey').onclick = () => {
+      if (!data.length) return;
+      const key = {};
+      data.forEach(q => { if (q.answer) key[String(q.id)] = q.answer; });
+      download('answer_key.json', JSON.stringify(key, null, 2));
+    };
+  </script>
+</body>
+</html>
