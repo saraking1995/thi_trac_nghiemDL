@@ -2,42 +2,115 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Thi trắc nghiệm Điều lệnh CAND 2025 — 20 câu (hiển thị từng câu)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Thi trắc nghiệm Điều lệnh CAND 2025 — 20 câu (nộp một lần)</title>
   <style>
-    :root { --w: 900px; }
-    *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;background:#f7fafc;color:#222}
-    header{background:#0d6efd;color:#fff;padding:16px}
-    header h1{margin:0;font-size:20px}
-    main{max-width:var(--w);margin:20px auto;padding:0 12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.05);padding:18px;margin-bottom:16px}
-    .muted{color:#6b7280;font-size:14px}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row > * {flex:1}
-    button{border:0;background:#0d6efd;color:#fff;padding:12px 16px;border-radius:10px;font-weight:600;cursor:pointer}
-    button.secondary{background:#6b7280}
-    button.ghost{background:#eef2ff;color:#1f2937}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .choices{margin-top:8px}
-    .choice{display:flex;gap:10px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer}
-    .choice input{margin-top:3px}
-    .choice.correct{border-color:#16a34a;background:#ecfdf5}
-    .choice.wrong{border-color:#dc2626;background:#fef2f2}
-    .pill{display:inline-block;background:#eef2ff;color:#1f2937;border-radius:999px;padding:2px 10px;font-size:12px;margin-left:8px}
-    .score{font-size:20px;font-weight:700}
-    .center{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    @media (max-width:600px){header h1{font-size:18px}}
+    :root {
+      --container: 900px;
+      --radius: 12px;
+      --space: 16px;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f7fafc;
+      --brand: #0d6efd;
+      --ok: #10b981;
+      --ok-bg: #d1fae5;
+      --warn: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      background: var(--bg);
+      color: #222;
+      -webkit-tap-highlight-color: transparent;
+    }
+    header {
+      background: var(--brand);
+      color: #fff;
+      padding: 14px var(--space);
+    }
+    header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    .pill { display: inline-block; background: #eef2ff; color: #1f2937; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin-left: 8px; }
+
+    main { max-width: var(--container); margin: 12px auto 80px; padding: 0 var(--space); }
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 2px 6px rgba(0,0,0,.05); padding: 14px; margin-bottom: 12px;
+    }
+    .muted { color: var(--muted); font-size: 14px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 0; background: var(--brand); color: #fff; padding: 12px 16px;
+      border-radius: 10px; font-weight: 600; cursor: pointer; width: 100%;
+    }
+    button.secondary { background: #6b7280; }
+    button.ghost { background: #eef2ff; color: #1f2937; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Sticky status bar (mobile-friendly) */
+    .stickybar {
+      position: sticky; top: 0; z-index: 50;
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
+    }
+    #timer { font-weight: 800; }
+    #timer.warn { color: var(--warn); }
+
+    /* Progress grid */
+    #progressGridWrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 8px 0 2px; }
+    #progressGrid {
+      display: grid; grid-template-columns: repeat(20, 1fr); gap: 6px; min-width: 560px;
+    }
+    .pCell {
+      border: 1px solid #ccc; border-radius: 8px; padding: 6px 0; text-align: center; cursor: pointer; font-size: 13px; background: #f3f4f6; user-select: none;
+    }
+    .pCell.answered { background: var(--ok-bg); border-color: var(--ok); }
+    .pCell.current { border: 2px solid var(--brand); background: #fff; }
+
+    /* Choices (touch-friendly) */
+    .choices { margin-top: 8px; display: grid; gap: 8px; }
+    .choice {
+      display: grid; grid-template-columns: 24px 1fr; align-items: start;
+      gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px;
+      cursor: pointer;
+    }
+    .choice input { width: 22px; height: 22px; margin-top: 2px; }
+    .choice b { display: none; } /* ẩn nhãn A./B./C. render lại bằng text */
+    .choice-text { font-size: 16px; }
+
+    /* Nav buttons block (mobile first) */
+    .navRow { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 8px; }
+    .submitRow { margin-top: 8px; }
+
+    /* Result */
+    .score { font-size: 20px; font-weight: 700; }
+
+    /* Desktop tweaks */
+    @media (min-width: 700px) {
+      header h1 { font-size: 20px; }
+      .card { padding: 18px; margin-bottom: 16px; }
+      .stickybar { grid-template-columns: 1fr auto auto; }
+      button { width: auto; }
+      .navRow { grid-template-columns: 1fr 1fr; }
+      #progressGridWrapper { overflow-x: visible; }
+      #progressGrid { grid-template-columns: repeat(20, 1fr); min-width: auto; }
+    }
+
+    /* Safe bottom space for mobile */
+    .safe-bottom { height: 16px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Thi trắc nghiệm Điều lệnh, Quân sự, Võ thuật CAND 2025 <span class="pill">20 câu — hiển thị từng câu</span></h1>
+    <h1>Thi trắc nghiệm Điều lệnh CAND 2025 <span class="pill">20 câu — nộp một lần</span></h1>
   </header>
 
   <main>
     <div class="card">
-      <p class="muted">Mỗi lượt thi hệ thống bốc ngẫu nhiên 20 câu từ <code>questions.json</code>, trộn thứ tự đáp án. Bạn trả lời từng câu, bấm <b>Nộp đáp án</b> để chấm, rồi <b>Câu kế tiếp</b> để sang câu tiếp theo.</p>
+      <p class="muted">Bạn có <b>5 phút</b> để làm 20 câu. Hết giờ sẽ tự động nộp bài.</p>
       <div class="row">
         <button id="btnStart">Bắt đầu làm bài</button>
         <button id="btnRetake" class="secondary" style="display:none">Làm lại (bốc 20 câu mới)</button>
@@ -45,199 +118,202 @@
     </div>
 
     <div id="quizBox" class="card" style="display:none">
-      <div class="center">
+      <!-- Sticky status bar: progress + answered + timer -->
+      <div class="stickybar">
         <div id="progress" class="muted">Câu 1/20</div>
-        <div id="scoreMini" class="muted">Đúng: 0</div>
+        <div class="muted">Đã trả lời: <span id="answeredCnt">0</span>/20</div>
+        <div id="timer">05:00</div>
       </div>
-      <div id="qText" style="font-weight:600;margin:8px 0 10px"></div>
+
+      <!-- Progress grid -->
+      <div id="progressGridWrapper">
+        <div id="progressGrid"></div>
+      </div>
+
+      <!-- Question text -->
+      <div id="qText" style="font-weight:700; margin: 10px 0 8px; font-size: 16px;"></div>
+
+      <!-- Choices -->
       <div id="choices" class="choices"></div>
-      <div class="row">
-        <button id="btnSubmit" class="ghost">Nộp đáp án</button>
-        <button id="btnNext" disabled>Câu kế tiếp</button>
+
+      <!-- Navigation -->
+      <div class="navRow">
+        <button id="btnPrev" class="ghost">Câu trước</button>
+        <button id="btnNext" class="ghost">Câu tiếp</button>
       </div>
+
+      <!-- Submit -->
+      <div class="submitRow">
+        <button id="btnSubmit" class="secondary" style="width:100%">Nộp bài</button>
+      </div>
+
+      <div id="note" class="muted" style="margin-top:6px"></div>
     </div>
 
     <div id="result" class="card" style="display:none"></div>
+    <div class="safe-bottom"></div>
   </main>
 
   <script>
-    // --- Utilities ---
-    const rngShuffle = arr => {
-      // Fisher–Yates
-      const a = arr.slice();
-      for (let i=a.length-1;i>0;i--){
-        const j = Math.floor(Math.random()*(i+1));
-        [a[i],a[j]] = [a[j],a[i]];
-      }
-      return a;
-    };
-    const pickN = (arr, n) => rngShuffle(arr).slice(0, n);
+    // Utils
+    const rngShuffle = arr => { const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+    const pickN = (arr,n)=>rngShuffle(arr).slice(0,n);
 
-    // --- Elements ---
+    // Elements
     const btnStart = document.getElementById('btnStart');
     const btnRetake = document.getElementById('btnRetake');
     const quizBox = document.getElementById('quizBox');
     const qTextEl = document.getElementById('qText');
     const choicesEl = document.getElementById('choices');
-    const btnSubmit = document.getElementById('btnSubmit');
+    const btnPrev = document.getElementById('btnPrev');
     const btnNext = document.getElementById('btnNext');
+    const btnSubmit = document.getElementById('btnSubmit');
     const progressEl = document.getElementById('progress');
-    const scoreMiniEl = document.getElementById('scoreMini');
+    const answeredCntEl = document.getElementById('answeredCnt');
+    const noteEl = document.getElementById('note');
     const resultBox = document.getElementById('result');
+    const progressGrid = document.getElementById('progressGrid');
+    const timerEl = document.getElementById('timer');
 
-    // --- State ---
-    let bank = [];       // full bank from questions.json
-    let keyMap = {};     // optional extra keys from answer_key.json
-    let quiz = [];       // 20 selected questions
-    let current = 0;     // index of current question
-    let score = 0;       // correct count
-    let answers = [];    // [{id, chosen, correct}]
-    let locked = false;  // whether current question is already graded
+    // State
+    let bank=[], quiz=[], current=0, chosen={}, graded=false, timerId=null, remaining=300;
 
-    // Load data; if some questions lack "answer", try answer_key.json
-    async function loadData() {
-      const qRes = await fetch('questions.json?' + Date.now());
-      if (!qRes.ok) throw new Error('Không tải được questions.json');
+    // Load data (only questions with "answer")
+    async function loadData(){
+      const qRes = await fetch('questions.json?'+Date.now());
       bank = await qRes.json();
-
-      if (bank.some(q => !q.answer)) {
-        try {
-          const kRes = await fetch('answer_key.json?' + Date.now());
-          if (kRes.ok) keyMap = await kRes.json();
-        } catch(e){}
-      }
-      bank.forEach(q => {
-        if (!q.answer && keyMap[String(q.id)]) {
-          q.answer = String(keyMap[String(q.id)]).trim().toUpperCase();
+      // Nếu cần, hợp nhất answer_key.json:
+      try {
+        if (bank.some(q=>!q.answer)){
+          const kRes = await fetch('answer_key.json?'+Date.now());
+          if (kRes.ok){ const key = await kRes.json(); bank.forEach(q=>{ if(!q.answer && key[String(q.id)]) q.answer = String(key[String(q.id)]).toUpperCase(); }); }
         }
-      });
-      // Filter out questions without answers (to đảm bảo chấm từng câu chuẩn)
-      const hasKey = bank.filter(q => ['A','B','C'].includes((q.answer||'').toUpperCase()));
-      if (hasKey.length < 20) {
-        alert('Cần tối thiểu 20 câu có đáp án trong dữ liệu. Vui lòng bổ sung "answer" cho questions.json hoặc answer_key.json.');
-        throw new Error('Not enough keyed questions');
+      } catch(e){}
+      bank = bank.filter(q=>['A','B','C'].includes((q.answer||'').toUpperCase()));
+      if (bank.length < 20) throw new Error('Cần tối thiểu 20 câu có đáp án.');
+    }
+
+    function startQuiz(){
+      quiz = pickN(bank, 20).map(q=>({
+        id: q.id, text: q.text,
+        choices: rngShuffle([{label:'A',text:q.A},{label:'B',text:q.B},{label:'C',text:q.C}]),
+        correct: q.answer
+      }));
+      current=0; chosen={}; graded=false; remaining=300;
+      btnStart.style.display='none'; btnRetake.style.display='inline-block';
+      resultBox.style.display='none'; quizBox.style.display='block';
+      renderProgressGrid(); renderCurrent(); updateAnsweredCount(); startTimer();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderProgressGrid(){
+      progressGrid.innerHTML = '';
+      for(let i=0;i<quiz.length;i++){
+        const cell = document.createElement('div');
+        cell.className = 'pCell';
+        cell.textContent = i+1;
+        cell.onclick = ()=>{ current=i; renderCurrent(); };
+        progressGrid.appendChild(cell);
       }
-      bank = hasKey;
+      updateProgressGrid();
     }
-
-    function startQuiz() {
-      quiz = pickN(bank, 20).map(q => {
-        // build choices array with mapping to original labels
-        const options = [
-          {label:'A', text:q.A},
-          {label:'B', text:q.B},
-          {label:'C', text:q.C},
-        ];
-        const shuffled = rngShuffle(options);
-        return {
-          id: q.id,
-          text: q.text,
-          choices: shuffled,   // [{label,text}]
-          correct: q.answer    // 'A' | 'B' | 'C'
-        };
+    function updateProgressGrid(){
+      [...progressGrid.children].forEach((cell,i)=>{
+        cell.classList.toggle('answered', chosen[i]!=null);
+        cell.classList.toggle('current', i===current);
       });
-      current = 0;
-      score = 0;
-      answers = [];
-      btnStart.style.display = 'none';
-      btnRetake.style.display = 'inline-block';
-      resultBox.style.display = 'none';
-      quizBox.style.display = 'block';
-      renderCurrent();
     }
 
-    function renderCurrent() {
-      locked = false;
+    function renderCurrent(){
       const q = quiz[current];
-      progressEl.textContent = `Câu ${current+1}/${quiz.length} (Mã gốc: ${q.id})`;
-      scoreMiniEl.textContent = `Đúng: ${score}`;
+      progressEl.textContent = `Câu ${current+1}/20 (Mã ${q.id})`;
       qTextEl.textContent = q.text;
       choicesEl.innerHTML = '';
-      btnSubmit.disabled = false;
-      btnNext.disabled = true;
+      noteEl.textContent = '';
 
-      q.choices.forEach((ch, idx) => {
+      q.choices.forEach(ch=>{
         const wrap = document.createElement('label');
         wrap.className = 'choice';
         wrap.innerHTML = `
-          <input type="radio" name="q" value="${ch.label}" style="margin-top:3px" />
-          <div><b>${String.fromCharCode(65+idx)}.</b> ${ch.text}</div>
+          <input type="radio" name="q" value="${ch.label}" aria-label="${ch.text}">
+          <div class="choice-text">${ch.text}</div>
         `;
-        wrap.addEventListener('click', (e) => {
-          // clicking anywhere selects the radio
-          const input = wrap.querySelector('input');
-          if (!locked) input.checked = true;
-        });
+        const input = wrap.querySelector('input');
+        if (chosen[current]===ch.label) input.checked = true;
+        wrap.onclick = ()=>{ if(!graded){ input.checked = true; chosen[current] = ch.label; updateAnsweredCount(); } };
         choicesEl.appendChild(wrap);
       });
+
+      btnPrev.disabled = current===0;
+      btnNext.disabled = current===quiz.length-1;
+      updateProgressGrid();
     }
 
-    function gradeCurrent() {
-      if (locked) return;
-      const q = quiz[current];
-      const checked = choicesEl.querySelector('input[name="q"]:checked');
-      if (!checked) {
-        alert('Vui lòng chọn một phương án trước khi nộp.');
-        return;
+    function updateAnsweredCount(){
+      const count = Object.keys(chosen).length;
+      answeredCntEl.textContent = count;
+      if (count < quiz.length) noteEl.innerHTML = `<span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--warn')}">Còn ${quiz.length-count} câu chưa chọn.</span>`;
+      else noteEl.innerHTML = `<span style="color:#16a34a">Đã chọn đủ 20/20.</span>`;
+      updateProgressGrid();
+    }
+
+    function goPrev(){ if(current>0){ current--; renderCurrent(); } }
+    function goNext(){ if(current<quiz.length-1){ current++; renderCurrent(); } }
+
+    function submitAll(){
+      if (graded) return;
+      const un = quiz.map((_,i)=>i).filter(i=>!chosen.hasOwnProperty(i));
+      if (un.length){
+        const ok = confirm(`Bạn còn ${un.length} câu chưa chọn. Vẫn nộp bài?`);
+        if (!ok) return;
       }
-      const chosen = checked.value; // original label of that choice (A/B/C by source)
-      const isCorrect = chosen === q.correct;
-
-      // Colorize: find which rendered item corresponds to correct ORIGINAL label
-      const wraps = [...choicesEl.querySelectorAll('.choice')];
-      wraps.forEach((wrap, idx) => {
-        const input = wrap.querySelector('input');
-        const origLabel = q.choices[idx].label; // original label from bank
-        if (origLabel === q.correct) wrap.classList.add('correct');
-        if (input.checked && origLabel !== q.correct) wrap.classList.add('wrong');
-        // disable click after submit
-        input.disabled = true;
-      });
-
-      if (isCorrect) score++;
-      scoreMiniEl.textContent = `Đúng: ${score}`;
-      answers.push({ id: q.id, chosen, correct: q.correct });
-      locked = true;
-      btnSubmit.disabled = true;
-      btnNext.disabled = false;
+      clearInterval(timerId);
+      let score = 0; const details = [];
+      quiz.forEach((q,i)=>{ const pick = chosen[i] || '—'; if (pick===q.correct) score++; details.push({i, id:q.id, picked:pick, correct:q.correct}); });
+      graded = true; showSummary(score, details);
     }
 
-    function nextQuestion() {
-      if (!locked) return; // must submit first
-      current++;
-      if (current < quiz.length) {
-        renderCurrent();
-      } else {
-        showSummary();
-      }
-    }
-
-    function showSummary() {
-      quizBox.style.display = 'none';
-      resultBox.style.display = 'block';
+    function showSummary(score, details){
+      quizBox.style.display = 'none'; resultBox.style.display = 'block';
       const pct = Math.round(score/quiz.length*100);
       resultBox.innerHTML = `
-        <div class="score">Kết quả: ${score}/${quiz.length} (${pct}%)</div>
-        <details style="margin-top:8px"><summary>Xem chi tiết từng câu</summary>
+        <div class="score">Kết quả: ${score}/20 (${pct}%)</div>
+        <details style="margin-top:8px">
+          <summary>Xem chi tiết</summary>
           <ol style="margin-top:8px">
-            ${answers.map((a,i) => `<li>Câu ${i+1} (Mã ${quiz[i].id}): bạn chọn ${a.chosen}; đúng là ${a.correct}</li>`).join('')}
+            ${details.map(d=>`<li>Câu ${d.i+1} (Mã ${d.id}): bạn chọn <b>${d.picked}</b>; đúng là <b>${d.correct}</b></li>`).join('')}
           </ol>
         </details>
-        <div class="row" style="margin-top:12px">
-          <button class="secondary" id="btnAgain">Làm lại (bốc 20 câu mới)</button>
+        <div class="row" style="margin-top:10px">
+          <button id="btnAgain" class="secondary" style="width:100%">Làm lại (bốc 20 câu mới)</button>
         </div>
       `;
-      document.getElementById('btnAgain').onclick = () => startQuiz();
+      document.getElementById('btnAgain').onclick = ()=> startQuiz();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function startTimer(){
+      clearInterval(timerId);
+      renderTimer(); // render ngay
+      timerId = setInterval(()=>{
+        remaining--;
+        if (remaining <= 60) timerEl.classList.add('warn'); // cảnh báo <= 60s
+        if (remaining <= 0) { clearInterval(timerId); submitAll(); return; }
+        renderTimer();
+      }, 1000);
+    }
+    function renderTimer(){
+      const m = Math.floor(remaining/60).toString().padStart(2,'0');
+      const s = (remaining%60).toString().padStart(2,'0');
+      timerEl.textContent = `${m}:${s}`;
     }
 
     // Events
-    btnStart.onclick = async () => {
-      try { await loadData(); startQuiz(); }
-      catch(e){ console.error(e); }
-    };
-    btnRetake.onclick = () => startQuiz();
-    btnSubmit.onclick = gradeCurrent;
-    btnNext.onclick = nextQuestion;
+    btnStart.onclick = async ()=>{ try { await loadData(); startQuiz(); } catch(e){ alert(e.message || e); } };
+    btnRetake.onclick = ()=> startQuiz();
+    btnPrev.onclick = ()=> goPrev();
+    btnNext.onclick = ()=> goNext();
+    btnSubmit.onclick = ()=> submitAll();
   </script>
 </body>
 </html>
