@@ -1,21 +1,227 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thi Trắc Nghiệm Điều Lệnh CAND</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Thi trắc nghiệm Điều lệnh CAND 2025 — 20 câu ngẫu nhiên</title>
+  <style>
+    :root { --w: 900px; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;background:#f7fafc;color:#222}
+    header{background:#0d6efd;color:#fff;padding:16px}
+    header h1{margin:0;font-size:20px}
+    main{max-width:var(--w);margin:20px auto;padding:0 12px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.05);padding:18px;margin-bottom:16px}
+    .muted{color:#6b7280;font-size:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > * {flex:1}
+    button{border:0;background:#0d6efd;color:#fff;padding:12px 16px;border-radius:10px;font-weight:600;cursor:pointer}
+    button.secondary{background:#6b7280}
+    button.ghost{background:#eef2ff;color:#1f2937}
+    .choices{margin-top:8px}
+    .choice{display:flex;gap:10px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer}
+    .choice input{margin-top:3px}
+    .choice.correct{border-color:#16a34a;background:#ecfdf5}
+    .choice.wrong{border-color:#dc2626;background:#fef2f2}
+    .pill{display:inline-block;background:#eef2ff;color:#1f2937;border-radius:999px;padding:2px 10px;font-size:12px;margin-left:8px}
+    .score{font-size:20px;font-weight:700}
+    .footer-note{margin-top:24px;font-size:12px;color:#6b7280}
+    .hidden{display:none}
+    details summary{cursor:pointer;font-weight:600;margin-bottom:8px}
+    @media (max-width:600px){header h1{font-size:18px}}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Thi Trắc Nghiệm Điều Lệnh, Quân Sự, Võ Thuật CAND 2025</h1>
-        <div id="quiz-container">
-            <div id="questions"></div>
-            <button id="submit-btn">Nộp bài</button>
-            <div id="result"></div>
-            <button id="restart-btn" style="display: none;">Làm lại</button>
-        </div>
+  <header>
+    <h1>Thi trắc nghiệm Điều lệnh, Quân sự, Võ thuật CAND 2025 <span class="pill">20 câu ngẫu nhiên</span></h1>
+  </header>
+
+  <main>
+    <div class="card">
+      <p class="muted">Ngân hàng 100 câu hỏi được lấy từ tài liệu bạn đã cung cấp. Mỗi lượt thi hệ thống sẽ bốc ngẫu nhiên 20 câu, trộn thứ tự đáp án.</p>
+      <div class="row">
+        <button id="btnStart">Bắt đầu làm bài</button>
+        <button id="btnRetake" class="secondary hidden">Làm lại (bốc 20 câu mới)</button>
+        <button id="btnReveal" class="ghost hidden" title="Hiện đáp án để tự học">Hiện đáp án</button>
+      </div>
     </div>
-    <script src="script.js"></script>
+
+    <form id="quizForm" class="hidden"></form>
+
+    <div id="result" class="card hidden"></div>
+
+    <div class="footer-note">
+      Nguồn câu hỏi: tài liệu PDF do bạn cung cấp. :contentReference[oaicite:0]{index=0}
+    </div>
+  </main>
+
+  <script>
+    // --- Utilities ---
+    const shuffle = arr => arr.map(v=>({v, r:crypto.getRandomValues(new Uint32Array(1))[0]}))
+                              .sort((a,b)=>a.r-b.r).map(o=>o.v);
+    const pickN = (arr, n) => shuffle(arr).slice(0, n);
+
+    // --- Global state ---
+    let bank = [];         // full bank
+    let keyMap = {};       // { "1": "A", ... }
+    let quiz = [];         // 20 picked questions (objects with id,text,choices,answer)
+    let revealMode = false;
+
+    const form = document.getElementById('quizForm');
+    const resultBox = document.getElementById('result');
+    const btnStart = document.getElementById('btnStart');
+    const btnRetake = document.getElementById('btnRetake');
+    const btnReveal = document.getElementById('btnReveal');
+
+    async function loadData() {
+      const [qRes, kRes] = await Promise.all([
+        fetch('questions.json?' + Date.now()),
+        fetch('answer_key.json?' + Date.now())
+      ]);
+      if (!qRes.ok) throw new Error('Không tải được questions.json');
+      if (!kRes.ok) throw new Error('Không tải được answer_key.json');
+      bank = await qRes.json();
+      keyMap = await kRes.json();
+      // attach correct key into each question (if available)
+      bank.forEach(q => q.answer = keyMap[String(q.id)]?.trim().toUpperCase() || null);
+    }
+
+    function renderQuiz() {
+      form.innerHTML = '';
+      form.classList.remove('hidden');
+      resultBox.classList.add('hidden');
+
+      quiz.forEach((q, idx) => {
+        // Build choices as array of {label:'A', text:'...', isCorrect:boolean}
+        const rawChoices = [
+          { label:'A', text:q.A },
+          { label:'B', text:q.B },
+          { label:'C', text:q.C },
+        ];
+        const correctLabel = q.answer || null;
+        const mixed = shuffle(rawChoices);
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="muted">Câu ${idx+1} • Mã gốc: ${q.id}</div>
+          <div style="font-weight:600;margin:6px 0 8px">${q.text}</div>
+          <div class="choices"></div>
+        `;
+        const box = card.querySelector('.choices');
+        mixed.forEach(ch => {
+          const id = `q${idx}_${ch.label}`;
+          const wrap = document.createElement('label');
+          wrap.className = 'choice';
+          wrap.innerHTML = `
+            <input type="radio" name="q${idx}" value="${ch.label}" id="${id}" />
+            <div><b>${ch.label}.</b> ${ch.text}</div>
+          `;
+          // If reveal mode and we know the key, mark
+          if (revealMode && correctLabel) {
+            if (ch.label === correctLabel) wrap.classList.add('correct');
+          }
+          box.appendChild(wrap);
+        });
+        form.appendChild(card);
+      });
+
+      // Submit button
+      const actions = document.createElement('div');
+      actions.className = 'card';
+      actions.innerHTML = `
+        <div class="row">
+          <button type="submit">Nộp bài & chấm điểm</button>
+          <button type="button" class="secondary" id="btnClear">Xóa chọn</button>
+        </div>
+      `;
+      form.appendChild(actions);
+      actions.querySelector('#btnClear').onclick = () => {
+        [...form.querySelectorAll('input[type=radio]')].forEach(i => i.checked = false);
+      };
+    }
+
+    function grade() {
+      let correct = 0, total = quiz.length;
+      const answers = [];
+      // Check each question by index position
+      quiz.forEach((q, idx) => {
+        const checked = form.querySelector(`input[name="q${idx}"]:checked`);
+        const chosen = checked ? checked.value : null;
+        const key = q.answer || null;
+
+        // Highlight
+        const wraps = [...form.querySelectorAll(`input[name="q${idx}"]`)].map(i => i.closest('.choice'));
+        wraps.forEach(w => w.classList.remove('correct','wrong'));
+
+        if (key) {
+          // we know the answer key
+          if (chosen === key) {
+            correct++;
+          }
+          // colorize
+          wraps.forEach(w => {
+            const label = w.querySelector('b').textContent.replace('.','').trim();
+            if (label === key) w.classList.add('correct');
+            if (chosen && label === chosen && chosen !== key) w.classList.add('wrong');
+          });
+        } else {
+          // no key provided — neutral (practice mode)
+          if (chosen) {
+            // do nothing fancy, keep neutral; could later be compared after key is supplied
+          }
+        }
+        answers.push({ id:q.id, chosen, key });
+      });
+
+      const pct = Math.round(correct/total*100);
+      resultBox.classList.remove('hidden');
+      resultBox.innerHTML = `
+        <div class="score">Kết quả: ${correct}/${total} (${pct}%)</div>
+        <p class="muted">${quiz.filter(q=>!q.answer).length>0
+            ? 'Một số câu chưa có đáp án trong answer_key.json — hệ thống chấm ở chế độ luyện tập (không tính điểm những câu đó).'
+            : 'Bạn có thể bấm “Làm lại” để bốc 20 câu mới.'}</p>
+        <details><summary>Xem đáp án & lựa chọn đã chọn</summary>
+          <ol>${quiz.map((q, i) => {
+            const picked = (form.querySelector(`input[name="q${i}"]:checked`)||{}).value || '—';
+            return `<li>Mã câu ${q.id}: Chọn ${picked}; Đáp án đúng: ${q.answer || '—'}</li>`;
+          }).join('')}</ol>
+        </details>
+      `;
+      btnRetake.classList.remove('hidden');
+      btnReveal.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    async function start() {
+      revealMode = false;
+      btnReveal.classList.add('hidden');
+      await loadData();
+      if (!Array.isArray(bank) || bank.length === 0) {
+        alert('questions.json đang rỗng. Hãy tạo bằng parse.html hoặc điền thủ công.');
+        return;
+      }
+      // Ensure unique IDs
+      const ids = new Set(bank.map(q=>q.id));
+      if (ids.size !== bank.length) console.warn('Cảnh báo: trùng id trong ngân hàng câu hỏi.');
+
+      quiz = pickN(bank, Math.min(20, bank.length));
+      renderQuiz();
+    }
+
+    btnStart.onclick = start;
+    btnRetake.onclick = start;
+
+    btnReveal.onclick = () => {
+      if (!quiz.length) return;
+      revealMode = !revealMode;
+      btnReveal.textContent = revealMode ? 'Ẩn đáp án' : 'Hiện đáp án';
+      renderQuiz(); // re-render to show/hide green marks
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      grade();
+    });
+  </script>
 </body>
 </html>
